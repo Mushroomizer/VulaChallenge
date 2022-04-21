@@ -4,14 +4,14 @@ using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
-using System.Threading.Tasks;
+using PollParser.Extensions;
 using PollParser.Models;
 
 namespace PollParser
 {
-    class Program
+    internal class Program
     {
-        static void Main(string[] args)
+        private static void Main(string[] args)
         {
             var inputZip = "";
             //Handle invalid input and print a help message
@@ -22,7 +22,7 @@ namespace PollParser
                 Console.WriteLine("Note: Parses favorites.txt");
                 //So you dont have to type the filepath every time
                 Console.WriteLine("Enter the filepath to a zipped data file(press enter for \"data.zip\"):");
-                inputZip = Console.ReadLine().Trim();
+                inputZip = Console.ReadLine()?.Trim();
                 if (string.IsNullOrEmpty(inputZip))
                 {
                     inputZip = "data.zip";
@@ -37,26 +37,25 @@ namespace PollParser
             //Disposable handler for reading the zipped file
             try
             {
-                using (ZipArchive za = ZipFile.OpenRead(inputZip))
-                {
-                    users = ParseUsers(za, "\t");
-                    favourites = ParseFavourites(za, " ");
-                }
+                using var za = ZipFile.OpenRead(inputZip);
+                users = za.ParseUsers("\t");
+                favourites = za.ParseFavourites(" ");
             }
             catch (FileNotFoundException e)
             {
                 Console.WriteLine("Could not find file: " + e.FileName);
-                Console.ReadLine();//Readline so the console doesnt close
+                Console.ReadLine(); //Readline so the console doesnt close
                 return;
             }
             catch (Exception e)
             {
                 Console.WriteLine("Error: " + e.Message);
-                Console.ReadLine();//Readline so the console doesnt close
+                Console.ReadLine(); //Readline so the console doesnt close
                 return;
             }
+
             Console.WriteLine($"Successfully parsed the files in {sw.Elapsed.TotalSeconds} seconds");
-            
+
 
             // Process the parsed data
             var favouriteColor = favourites.GroupBy(x => x.Colour).OrderByDescending(x => x.Count()).ToList()
@@ -70,7 +69,7 @@ namespace PollParser
             ShowMenu(favouriteColor, usersWhoVotedForTheColourOrdered);
         }
 
-        static void ShowMenu(IGrouping<string, Favourite> favouriteColor,
+        private static void ShowMenu(IGrouping<string, Favourite> favouriteColor,
             IOrderedEnumerable<User> usersWhoVotedForTheColourOrdered)
         {
             //Loop, allowing the user to select a menu option
@@ -101,72 +100,6 @@ namespace PollParser
                         break;
                 }
             }
-        }
-
-        static List<User> ParseUsers(ZipArchive za, string separator)
-        {
-            var usersFile = za.GetEntry("users.txt");
-            if (usersFile == null)
-            {
-                Console.WriteLine("No users.txt file found");
-                return new List<User>();
-            }
-
-            using var reader = new StreamReader(usersFile.Open());
-
-            var users = new List<User>();
-            while (!reader.EndOfStream)
-            {
-                var line = reader.ReadLine();
-                try
-                {
-                    var parts = line?.Split(separator);
-                    users.Add(new User
-                    {
-                        Id = int.Parse(parts[0].Trim()),
-                        Name = parts[1].Trim()
-                    });
-                }
-                catch (Exception e)
-                {
-                    Console.WriteLine($"Could not parse line {line}", e);
-                }
-            }
-
-            return users;
-        }
-
-        static List<Favourite> ParseFavourites(ZipArchive za, string separator)
-        {
-            var favouritesFile = za.GetEntry("favourites.txt");
-            if (favouritesFile == null)
-            {
-                Console.WriteLine("Favourites file not found");
-                return new List<Favourite>();
-            }
-
-            using var reader = new StreamReader(favouritesFile.Open());
-
-            var users = new List<Favourite>();
-            while (!reader.EndOfStream)
-            {
-                var line = reader.ReadLine();
-                try
-                {
-                    var parts = line?.Split(separator);
-                    users.Add(new Favourite()
-                    {
-                        UserId = int.Parse(parts[0].Trim()),
-                        Colour = parts[1].Trim()
-                    });
-                }
-                catch (Exception e)
-                {
-                    Console.WriteLine($"Could not parse line {line}", e);
-                }
-            }
-
-            return users;
         }
     }
 }
